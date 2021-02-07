@@ -1,0 +1,96 @@
+---
+title: "STK2100 Oblig 1"
+author: "Håkon Kvernmoen"
+date: "2/4/2021"
+output: pdf_document
+---
+
+# Problem 1
+## a)
+
+First we need to load the data. The code sample for loading did not work for me (got a 400 bad request error). Assuming the datafile "nuclear.dat" is located in the same folder as this file, we load the data and attach it for easier use.
+
+```{r}
+nuclear = read.table("nuclear.dat", sep="\t", header=T)
+attach(nuclear)
+```
+
+We notice that \texttt{pr}, \texttt{ne}, \texttt{ct}, \texttt{bw} and \texttt{pt} are binary variables, so we set them as factors.
+
+```{r}
+nuclear$pr = as.factor(nuclear$pr)
+nuclear$ne = as.factor(nuclear$ne)
+nuclear$ct = as.factor(nuclear$ct)
+nuclear$bw = as.factor(nuclear$bw)
+nuclear$pt = as.factor(nuclear$pt)
+```
+
+To investigate the data we plot the numerical features against each other. There seems to be some correlation between \texttt{date} and \texttt{t1}  
+
+```{r}
+plot(nuclear[,sapply(nuclear, is.numeric)])
+```
+
+## b)
+
+The standard assumption on the noise terms \text{$\epsilon_i$} are.
+
+1. The error terms are normally distributed with a mean of 0
+2. The variance \text{$\sigma^2$} of this normal distribution is constant
+3. The error terms are independent, \text{$\epsilon_i$} does not influence \text{$\epsilon_j$} 
+
+Important?
+
+We will now try to fit the model using all the features. As cost is always positive, we fit the log of the cost as a response variable. With \text{$y_{i}$} being the i'th observation of the cost, we will try to fit the model.
+
+$$
+log(y_i) = \beta_0 + \sum_{j=1}^{p} x_{i,j} + \epsilon_i 
+$$
+```{r}
+all.fit = lm(log(cost)~., data = nuclear)
+summary(all.fit)
+```
+
+
+## c)
+
+We will now remove the term with the largest P-value. Observing the summary of the linear model, we see that \texttt{t1} has the largest P-value at 0.81610. This is sensible to do since the P-value is a measure of the correctness of the null-hypothesis (\text{$H_0$}). A large P-value as in this case indicates that there is a very little statistical basis for \texttt{t1} to be a good predictor for log(\texttt{cost}) and is thus neglected.
+
+```{r}
+all_no_t1.fit = lm(log(cost)~.-t1, data= nuclear)
+summary(all_no_t1.fit)
+```
+We observe that there are some change in the P-values for a lot of the features after we excluded \texttt{t1}. This is probably due to correlation between the features. We would ideally have linearly independent explanatory variables. In example a change in \texttt{cap} should not influence any of the other explanatory variables, but this is not the case. On the other hand, the changes in P-values are not huge and the coefficients estimates seems relatively unchanged. In addition the standard error for the coefficients seems to decrease and we continue these modifications.
+
+## d)
+We now want to fit our model, remove the explanatory variable with a P-value larger than 0.05 and repeat this until we have a model where all explanatory variables have P-values smaller than 0.05. We then implement a backward substitution algorithm. We note that we do not want to remove the intercept even tough its P-value can be larger than 0.05.
+
+```{r}
+nuclear_backwards_sub <- data.frame(nuclear) 
+for (i in 1:ncol(nuclear)) {
+    fit <- lm(log(cost)~., data=nuclear_backwards_sub)
+    # -1 since we don't want to remove intercept
+    p_vals <- summary(fit)$coefficients[-1,4]
+    max_idx <- as.integer(which.max(p_vals)) 
+  
+    if(p_vals[max_idx] < 0.05) {
+      break
+    } 
+    else {
+      # Add one since we don't want to remove targert variable (cost).
+      nuclear_backwards_sub <- nuclear_backwards_sub[,-(max_idx+1)] 
+    }
+}
+
+summary(fit)
+```
+
+We are then left with 4 explanatory variables. Two of them continues (\texttt{date, cap}) and two binary (\texttt{ne, pt}).
+MAKE SOME PLOTS
+
+## e)
+Finally we calculate the MSE
+
+```{r}
+MSE = mean((fit$residuals))
+```
