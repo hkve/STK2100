@@ -86,11 +86,45 @@ summary(fit)
 ```
 
 We are then left with 4 explanatory variables. Two of them continues (\texttt{date, cap}) and two binary (\texttt{ne, pt}).
-MAKE SOME PLOTS
+
+```{r}
+par(mfrow=c(2,2))
+plot(fit)
+```
+
+The model seems to fit reasonably well, but the simple linear model does not seem to capture the complexity of the data. From the residuals against fitted values plot we see that the residual mean seems to be around 0 for the lower fitted values, but for higher values log(\texttt{cost}) > 6.1 the mean seems to not be centered around 0. This is probably due to a small data set. The QQ-plot confirms this displaying that data point 7, 10 and 19 deviates a lot from the theoretical quantiles. From the Standardized residuals against leverage plot point 10 and 19 again shows a high deviance and should probably be considered outliers. Lastly point 26 deviates from the mean of zero as well as having a high leverage (influence on the model) and should also be considerd as an outlier. 
 
 ## e)
 Finally we calculate the MSE
 
 ```{r}
-MSE = mean((fit$residuals))
+MSE = (cost-exp(fitted.values(fit)))^2
+MSE = mean(MSE)
+MSE
 ```
+
+This MSE is high and most of the contribution comes from the data points discussed in d). There is also a major drawback to this approach, as we have tested the correctness of our model (using the MSE) on the same data that we used to fit the model. The MSE resulted in a large value either way, but this should generally be avoided as more flexible models can follow the data used too closely (overfitting) and not represent the whole population. A better approach would be to split the data into a training and testing set, using only the training data to fit the model and then evaluate the correctness using the training data. Other techniques such as cross-validation can also be used.   
+
+## g)
+
+We first use backward selection with the AIC.
+```{r}
+library("MASS")
+stepAIC(all.fit, direction = "backward")
+```
+Then the same with BIC
+```{r}
+n = nrow(nuclear)
+stepAIC(all.fit, direction="backward", k=log(n))
+```
+
+Both AIC and BIC starts with the full model and tries to remove one explanatory variable. The model with the highest likelihood is chosen and the cycle continues until there is no improvement in AIC-value. The two models we ended up with was
+
+AIC:  \texttt{date,t2, cap, pr, ne, ct, cum.n, pt}
+
+BIC: \texttt{date, cap, ne, ct, pt}
+
+## h)
+
+## g)
+P-values does not take complexity into account.
