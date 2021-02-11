@@ -105,6 +105,30 @@ MSE
 
 This MSE is high and most of the contribution comes from the data points discussed in d). There is also a major drawback to this approach, as we have tested the correctness of our model (using the MSE) on the same data that we used to fit the model. The MSE resulted in a large value either way, but this should generally be avoided as more flexible models can follow the data used too closely (overfitting) and not represent the whole population. A better approach would be to split the data into a training and testing set, using only the training data to fit the model and then evaluate the correctness using the training data. Other techniques such as cross-validation can also be used.   
 
+## f)
+
+We begin with the likelihood function for a linear model with Gaussian error terms. Writing \text{$\mathbf{x}_i$} as  the i'th data point with all \text{$q-1$} 
+
+$$
+L(\boldsymbol{\theta}) = \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi\sigma^2}} e^{\left(-\frac{(y_i-\mathbf{x}_i^T \boldsymbol{\theta})^2}{2\sigma^2}\right)}
+$$
+To avoid the product sum we take the log of the likelihood, giving the log-likelihood. Note that \text{$\log$} refers to the natural logarithm.
+
+$$
+log(L(\boldsymbol{\theta})) = \sum_{i=1}^{n} -\frac{1}{2}log(\sigma^2) -  \frac{(y_i-\mathbf{x}^T \boldsymbol{\theta})^2}{2\sigma^2}  + const = -\frac{n}{2}log(\sigma^2) -  \frac{||\mathbf{y}-\mathbf{X}\boldsymbol{\theta}||^2}{2\sigma^2}  + const
+$$
+Inserting the maximum liklihood estimate \text{$\hat{\boldsymbol{\theta}}$} and estimating the variance \text{$\hat{\sigma^2} = ||\mathbf{y}-\mathbf{X}\hat{\boldsymbol{\theta}}||^2/n$}, the log likelihood evaluated at the at the maximum likelihood estimate becomes.
+
+$$
+log(L(\hat{\boldsymbol{\theta}})) = -\frac{n}{2} log(\hat{\sigma^2}) - \frac{n\sigma^2}{2\sigma^2} + const = -\frac{n}{2}log(\hat{\sigma^2}) - \frac{n}{2} + const.  
+$$
+As we will use this to preform variable selection, we absorb \text{$n$} into the const term, as it will be constant no matter the amount of variables we include in the model. Rearranging:
+
+$$
+-2log(\hat{\boldsymbol{\theta}}) = nlog(\sigma^2) + const
+$$
+Inserting this into the two equation for BIC and AIC will retrive the result presented in AIC.LM and BIC.LM
+
 ## g)
 
 We first use backward selection with the AIC.
