@@ -107,7 +107,7 @@ This MSE is high and most of the contribution comes from the data points discuss
 
 ## f)
 
-We begin with the likelihood function for a linear model with Gaussian error terms. Writing \text{$\mathbf{x}_i$} as  the i'th data point with all \text{$q-1$} 
+We begin with the likelihood function for a linear model with Gaussian error terms. Writing \text{$\mathbf{x}_i$} as  the i'th data point with all \text{$q$} features. 
 
 $$
 L(\boldsymbol{\theta}) = \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi\sigma^2}} e^{\left(-\frac{(y_i-\mathbf{x}_i^T \boldsymbol{\theta})^2}{2\sigma^2}\right)}
@@ -150,5 +150,10 @@ BIC: \texttt{date, cap, ne, ct, pt}
 
 ## h)
 
+Both AIC and BIC contain to parts. Both include a \text{$n log(\hat{\sigma}^2)$} term, measuring how good the model fits the data, and is equal in both procedures. The difference is in the second terms, \text{$2(q+2)$} and \text{$log(n) (q+2)$} for AIC and BIC respectively. This terms act as a regulator for complexity. Models with high complexity (i.e. many explanatory variables) will be penalized. If we leave one explanatory variable out, \text{$n log(\hat{\sigma}^2)$} will be equal for the two procedures, assuming we have left out the same explanatory variable. The two complexity regulator terms (\text{$2(q+2)$} and \text{$log(n) (q+2)$}) equal for one removal, and does not discriminate which explanatory variables left out. Thus starting at maximum complexity (including all explanatory variables), the order of what explanatory variable to remove, should be equal for the two procedures. The difference is in how much we should penalize the model. We have 32 observations, so \text{$log(32) \approx 3.46 > 2$}, thus for this dataset, BIC will punish complex models harder than AIC, which coincides with BIC resulting in fewer explanatory variables than AIC.  
+
 ## g)
-P-values does not take complexity into account.
+Selecting a model using the "arbitrary" criteria of a p-value less than 0.05 might lead to some problems. Our sample size is low (32 observations) and we have quite a lot of explanatory variables relative to samples. P-values are dependent on sample size, so some variables that should have a p-value under this threshold might be picked out even though they are statistically significant (NB: only if the \text{$H_0$} hypothesis is false). The stepwise AIC and BIC does not intringsantly have this problem as we are only trying to reduce AIC/BIC on the same data set. These step-wise schemes should be used carefully tough, since overfitting can be a problem. Both AIC and BIC tries many different models on the same data set and only reports if improvements are made and thus prone to data dredging.          
+
+<!-- BIC might choose a too simple model. -->
+<!-- P-values does not take complexity into account. -->
