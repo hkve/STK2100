@@ -68,9 +68,9 @@ We now want to fit our model, remove the explanatory variable with a P-value lar
 ```{r}
 nuclear_backwards_sub <- data.frame(nuclear) 
 for (i in 1:ncol(nuclear)) {
-    fit <- lm(log(cost)~., data=nuclear_backwards_sub)
+    p_values.fit <- lm(log(cost)~., data=nuclear_backwards_sub)
     # -1 since we don't want to remove intercept
-    p_vals <- summary(fit)$coefficients[-1,4]
+    p_vals <- summary(p_values.fit)$coefficients[-1,4]
     max_idx <- as.integer(which.max(p_vals)) 
   
     if(p_vals[max_idx] < 0.05) {
@@ -82,14 +82,14 @@ for (i in 1:ncol(nuclear)) {
     }
 }
 
-summary(fit)
+summary(p_values.fit)
 ```
 
 We are then left with 4 explanatory variables. Two of them continues (\texttt{date, cap}) and two binary (\texttt{ne, pt}).
 
 ```{r}
 par(mfrow=c(2,2))
-plot(fit)
+plot(p_values.fit)
 ```
 
 The model seems to fit reasonably well, but the simple linear model does not seem to capture the complexity of the data. From the residuals against fitted values plot we see that the residual mean seems to be around 0 for the lower fitted values, but for higher values log(\texttt{cost}) > 6.1 the mean seems to not be centered around 0. This is probably due to a small data set. The QQ-plot confirms this displaying that data point 7, 10 and 19 deviates a lot from the theoretical quantiles. From the Standardized residuals against leverage plot point 10 and 19 again shows a high deviance and should probably be considered outliers. Lastly point 26 deviates from the mean of zero as well as having a high leverage (influence on the model) and should also be considerd as an outlier. 
@@ -98,7 +98,7 @@ The model seems to fit reasonably well, but the simple linear model does not see
 Finally we calculate the MSE
 
 ```{r}
-MSE = (cost-exp(fitted.values(fit)))^2
+MSE = (cost-exp(fitted.values(p_values.fit)))^2
 MSE = mean(MSE)
 MSE
 ```
@@ -134,12 +134,17 @@ Inserting this into the two equation for BIC and AIC will retrive the result pre
 We first use backward selection with the AIC.
 ```{r}
 library("MASS")
-stepAIC(all.fit, direction = "backward")
+
+AIC.fit = lm(log(cost)~.,data = nuclear)
+AIC.fit = stepAIC(AIC.fit, direction = "backward")
 ```
 Then the same with BIC
 ```{r}
+AIC.fit$coefficients
+
 n = nrow(nuclear)
-stepAIC(all.fit, direction="backward", k=log(n))
+BIC.fit = lm(log(cost)~., data=nuclear)
+BIC.fit = stepAIC(BIC.fit, direction="backward", k=log(n))
 ```
 
 Both AIC and BIC starts with the full model and tries to remove one explanatory variable. The model with the highest likelihood is chosen and the cycle continues until there is no improvement in AIC-value. The two models we ended up with was
@@ -152,8 +157,122 @@ BIC: \texttt{date, cap, ne, ct, pt}
 
 Both AIC and BIC contain to parts. Both include a \text{$n log(\hat{\sigma}^2)$} term, measuring how good the model fits the data, and is equal in both procedures. The difference is in the second terms, \text{$2(q+2)$} and \text{$log(n) (q+2)$} for AIC and BIC respectively. This terms act as a regulator for complexity. Models with high complexity (i.e. many explanatory variables) will be penalized. If we leave one explanatory variable out, \text{$n log(\hat{\sigma}^2)$} will be equal for the two procedures, assuming we have left out the same explanatory variable. The two complexity regulator terms (\text{$2(q+2)$} and \text{$log(n) (q+2)$}) equal for one removal, and does not discriminate which explanatory variables left out. Thus starting at maximum complexity (including all explanatory variables), the order of what explanatory variable to remove, should be equal for the two procedures. The difference is in how much we should penalize the model. We have 32 observations, so \text{$log(32) \approx 3.46 > 2$}, thus for this dataset, BIC will punish complex models harder than AIC, which coincides with BIC resulting in fewer explanatory variables than AIC.  
 
-## g)
+## i)
 Selecting a model using the "arbitrary" criteria of a p-value less than 0.05 might lead to some problems. Our sample size is low (32 observations) and we have quite a lot of explanatory variables relative to samples. P-values are dependent on sample size, so some variables that should have a p-value under this threshold might be picked out even though they are statistically significant (NB: only if the \text{$H_0$} hypothesis is false). The stepwise AIC and BIC does not intringsantly have this problem as we are only trying to reduce AIC/BIC on the same data set. These step-wise schemes should be used carefully tough, since overfitting can be a problem. Both AIC and BIC tries many different models on the same data set and only reports if improvements are made and thus prone to data dredging.          
+
 
 <!-- BIC might choose a too simple model. -->
 <!-- P-values does not take complexity into account. -->
+
+## j)
+We define \text{$Z = \mu + \sigma W$} such that \text{$E[W] = 0, Var[W]=1$} (the standard normal). Since Z/W is drawn from a continuous normal distribution write the expectation value as.
+
+$$
+E[e^Z] = E[e^{\mu+\sigma W}] = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} e^{\mu + \sigma W}e^{-\frac{W^2}{2}} dW = \frac{e^\mu}{2\pi}\int_{-\infty}^{\infty} e^{\sigma W}e^{-\frac{W^2}{2}} dW
+$$
+Now we want to complete the square in the exponent. 
+
+$$
+\sigma W- \frac{W^2}{2} = \frac{1}{2}\left( W^2 - 2\sigma W + \sigma^2 \right) - \frac{\sigma^2}{2} = \frac{1}{2} \left( W-\sigma\right)^2 - \frac{\sigma^2}{2}
+$$
+
+Inserting this into our integral
+
+$$
+E[Z] = \frac{e^\mu}{2\pi}\int_{-\infty}^{\infty} e^{-\frac{1}{2}\left(W-\sigma \right)^2 + \frac{1}{2}\sigma^2} dW = \frac{e^{\mu + \frac{1}{2}\sigma^2}}{\sqrt{2\pi}} \int_{-\infty}^{\infty} e^{-\frac{(W-\sigma)^2}{2}} dW = e^{\mu+\frac{1}{2}\sigma^2}
+$$
+
+When estimating the \text{$\hat{\eta}$} we can consider two options, one reflecting the calculation just done \text{$\hat{\eta}_2 = e^{\hat{\theta}+\frac{1}{2}\hat{\sigma}^2}$} and one without the standard deviation estimate \text{$\hat{\eta}_1 = e^{\hat{\theta}}$}. I think \text{$\hat{\eta}_1$} is the preferred choice here, as the estimated coefficiants should be indipendent of the standard deviate of the Gaussian noise (assuming heteroskedasticity). 
+
+## k)
+We now define the new data point and use the 3 different models to make a prediction.
+
+```{r}
+nuclear.new = data.frame(date=70.0, t1=13, t2=50, cap = 800, pr=1, ne=0, ct=0, bw=1, cum.n=8, pt=1)
+
+nuclear.new$pr = as.factor(nuclear.new$pr)
+nuclear.new$ne = as.factor(nuclear.new$ne)
+nuclear.new$ct = as.factor(nuclear.new$ct)
+nuclear.new$bw = as.factor(nuclear.new$bw)
+nuclear.new$pt = as.factor(nuclear.new$pt)
+
+p_values.pred = predict.lm(p_values.fit, nuclear.new, se.fit=TRUE)
+AIC.pred = predict.lm(AIC.fit, nuclear.new, se.fit=TRUE)
+BIC.pred = predict.lm(BIC.fit, nuclear.new, se.fit=TRUE)
+
+sprintf("P-value estimate: %f SE: %f", exp(p_values.pred$fit),exp(p_values.pred$se.fit))
+sprintf("AIC estimate: %f SE: %f", exp(AIC.pred$fit),exp(AIC.pred$se.fit))
+sprintf("BIC estimate: %f SE: %f", exp(BIC.pred$fit),exp(BIC.pred$se.fit))
+```
+
+The results are summerised in table 1.
+
+\begin{table}[h!]
+\centering
+\caption{Different model predictions and standard errors}
+\begin{tabular}{|l|l|l|}
+\hline
+Model & Prediction & SE \\ \hline
+P-values & 356.490489   & 1.122362 \\ \hline
+AIC & 390.897773 & 1.161922 \\ \hline
+BIC & 360.778910 & 1.117556 \\
+\hline
+\end{tabular}
+\end{table}
+
+Overall, the standard error seems to be relatively equal across all the models. The prediction however, differs. The P-value and BIC a approaches seems to agree, giving almost equal predictions. The AIC model on the other hand, differs with about 30-35 from the two other predictions. Both the BIC and P-value method resulted in fewer explanatory variables giving a simpler model, while the AIC model had more complexity. As the BIC and P-values models agreed, this might suggest a too complex model (using AIC) to predict log(\texttt{cost}). However without knowing what value of \texttt{cost} this new data-point gives, makes model selection difficult and more data-points should also be considered.   
+
+# Problem 2
+## a)
+
+The following code splits the data set (once, randomly) into a training and test set of two equal parts. Using the same stepAIC scheme as before, but opting for forward selection compared to backward selection. The lowest complexity of the model is set as one the simple constant term, while the highest complexity is set to include all the explanatory variables. The stepAIC scheme is preformed 10 times, with \text{$i = 0,1,...,10$}. I here represents how many steps the AIC should take (how any explanatory variables should potentially be added) starting from the lowest complexity model. The RMSE from both the log(\texttt{cost}) and \texttt{cost} is calculated on the test set and then saved (for each i) and then finally plotted against the number of explanatory variables included. 
+
+Running the program creates the following plot, suggesting that the best model only has one parameter. There is some problems with this however, as there seems to be some randomness involved. Running the code multiple times produces different plots, but the minimum at 1 seems to be relatively stable. This is due to the test/train split being random. Every time we run the code, we train the model many times and pick the one that best fits the random testing set. The problem with this is that we might not get the best model, but simply the best model for that particularly testing set. The amount of different models tested is very large, so this does seem to be a problem.
+
+```{r, echo=T,results='hide',fig.keep='last'}
+n = nrow(nuclear)
+ind = sample(1:n,n/2,replace=FALSE)
+RMSE.test1 = rep(NA,11) 
+RMSE.test2 = rep(NA,11) 
+model_narrow = lm(log(cost) ~ 1, data = nuclear)
+model_wide = lm(log(cost) ~ ., data = nuclear)
+
+for(i in 0:10)
+{
+ fit = stepAIC(model_narrow, direction="forward", steps=i,data=nuclear[ind,],
+               scope=list(lower=model_narrow, upper=model_wide), k = 0)
+ pred = predict(fit,nuclear[-ind,])
+ RMSE.test1[i+1] = sqrt(mean((log(nuclear$cost)-pred)^2))
+ RMSE.test2[i+1] = sqrt(mean((nuclear$cost-exp(pred))^2))
+}
+par(mar = c(5, 4, 4, 4) + 0.3)  # Leave space for z axis
+plot(0:10,RMSE.test1,xlab="Complexity",ylab="RMSE1",type="l") # first plot
+par(new = TRUE)
+plot(0:10,RMSE.test2, type = "l", axes = FALSE, bty = "n", xlab = "", ylab = "",col=2)
+axis(side=4, at = pretty(range(RMSE.test2)))
+mtext("RMSE2", side=4, line=3)
+```
+
+## b)
+
+```{r, echo=T,results='hide',fig.keep='last'}
+library(lmvar)
+RMSE.cv1 = rep(0,10)
+RMSE.cv2 = rep(0,10)
+for(i in 0:10)
+{
+fit = stepAIC(model_narrow, direction="forward", steps=i,k=0,
+        scope=list(lower=model_narrow, upper=model_wide),trace=0)
+ fit = lm(formula(fit),data=nuclear,x=TRUE,y=TRUE)
+ #Note: the k in the command below has a different meaning than k above!!! 
+ RMSE.cv1[i+1] = cv.lm(fit,k=10)$MSE_sqrt$mean
+ RMSE.cv2[i+1] = cv.lm(fit,k=10,log=TRUE)$MSE_sqrt$mean
+}
+
+par(mar = c(5, 4, 4, 4) + 0.3)  # Leave space for z axis
+plot(0:10,RMSE.cv1,xlab="Complexity",ylab="RMSE1",type="l") # first plot
+par(new = TRUE)
+plot(0:10,RMSE.cv2, type = "l", axes = FALSE, bty = "n", xlab = "", ylab = "",col=2)
+axis(side=4, at = pretty(range(RMSE.test2)))
+mtext("RMSE2", side=4, line=3)
+```
