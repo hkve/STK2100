@@ -246,7 +246,7 @@ for(i in 0:10)
  RMSE.test2[i+1] = sqrt(mean((nuclear$cost-exp(pred))^2))
 }
 par(mar = c(5, 4, 4, 4) + 0.3)  # Leave space for z axis
-plot(0:10,RMSE.test1,xlab="Complexity",ylab="RMSE1",type="l") # first plot
+plot(0:10,RMSE.test1,main="Train/Test split",xlab="Complexity",ylab="RMSE1",type="l") # first plot
 par(new = TRUE)
 plot(0:10,RMSE.test2, type = "l", axes = FALSE, bty = "n", xlab = "", ylab = "",col=2)
 axis(side=4, at = pretty(range(RMSE.test2)))
@@ -254,25 +254,98 @@ mtext("RMSE2", side=4, line=3)
 ```
 
 ## b)
+The next code section uses 10-fold cross-validation. The same steps over \text{$i$} are done and for each step a model is selected (using stepAIC on the whole data set). Then the best model is chosen (for each step), the RMSE errors for both log(\texttt{cost}) and \texttt{cost} are calculated, but this time using 10-fold CV. The data-set is split into 10 parts, where 9 of these parts are used to train the optimal model found by the stepAIC. Then the RMSE is calculated on the last part (the hold out fold). This repeats until every part has been the hold out fold once, and the mean RSME over the 10-folds are calculated.
+
+Running this code several times yields relatively stable results, but there is some randomness involved. We are interested in the minimum of these two curves, which seems to be around 4-5 explanatory variables. The randomness again come from the division of the folds, as this is done randomly. The trend is relativly stable, but it is dificult to give a definit minimum.
 
 ```{r, echo=T,results='hide',fig.keep='last'}
-library(lmvar)
-RMSE.cv1 = rep(0,10)
-RMSE.cv2 = rep(0,10)
-for(i in 0:10)
-{
-fit = stepAIC(model_narrow, direction="forward", steps=i,k=0,
+# library(lmvar)
+# RMSE.cv1 = rep(0,10)
+# RMSE.cv2 = rep(0,10)
+# for(i in 0:10)
+# {
+# fit = stepAIC(model_narrow, direction="forward", steps=i,k=0,
+#         scope=list(lower=model_narrow, upper=model_wide),trace=0)
+#  fit = lm(formula(fit),data=nuclear,x=TRUE,y=TRUE)
+#  #Note: the k in the command below has a different meaning than k above!!! 
+#  RMSE.cv1[i+1] = cv.lm(fit,k=10)$MSE_sqrt$mean
+#  RMSE.cv2[i+1] = cv.lm(fit,k=10,log=TRUE)$MSE_sqrt$mean
+# }
+# 
+# par(mar = c(5, 4, 4, 4) + 0.3)  # Leave space for z axis
+# plot(0:10,RMSE.cv1,xlab="Complexity",ylab="RMSE1",type="l") # first plot
+# par(new = TRUE)
+# plot(0:10,RMSE.cv2, main="10-fold CV",type = "l", axes = FALSE, bty = "n", xlab = "", ylab = "",col=2)
+# axis(side=4, at = pretty(range(RMSE.cv2)))
+# mtext("RMSE2", side=4, line=3)
+```
+
+## c)
+
+We now want to implement Leave-one-out cross validation (LOOCV). From the \texttt{boot} library we make use of the \text{glm} function. This can be fed into a \texttt{cv.glm} function that be default uses LOOCV. Since we are fitting a ordinary least squares model we can make use of the fantastic shortcut 
+
+$$
+MSE = \frac{1}{n} \sum_{i=1}^{n}\left( \frac{y_i - \hat{y_i}}{1-h_{i}} \right)^2 \hspace{40px} RMSE = \sqrt{MSE} 
+$$
+Where \text{$h_i$} is the leverage. This actually makes the RMSE calculations a lot faster, since there is no need to fit the same model n times. Running the code many times confirms that these results are more stable than 10-fold CV and way more stable than Train/Test split. This yields a prefered model complexity of 4 explanatory variables.
+
+```{r}
+library(boot)
+RMSE.LOOCV1 = rep(0,11)
+RMSE.LOOCV2 = rep(0,11)
+for(i in 0:10) {
+  fit = stepAIC(model_narrow, direction="forward", steps=i,k=0,
         scope=list(lower=model_narrow, upper=model_wide),trace=0)
- fit = lm(formula(fit),data=nuclear,x=TRUE,y=TRUE)
- #Note: the k in the command below has a different meaning than k above!!! 
- RMSE.cv1[i+1] = cv.lm(fit,k=10)$MSE_sqrt$mean
- RMSE.cv2[i+1] = cv.lm(fit,k=10,log=TRUE)$MSE_sqrt$mean
+ fit = glm(formula(fit),data=nuclear,x=TRUE,y=TRUE)
+ 
+ RMSE.LOOCV1[i+1] = sqrt(cv.glm(nuclear ,fit)$delta[1])
+ 
+ nuclear.diag = glm.diag(fit)
+ yhat = exp(fitted(fit))
+ y= exp(fit$y)
+ RMSE.LOOCV2[i+1] = sqrt(mean((y-yhat)^2 / (1-nuclear.diag$h)^2))
 }
 
 par(mar = c(5, 4, 4, 4) + 0.3)  # Leave space for z axis
-plot(0:10,RMSE.cv1,xlab="Complexity",ylab="RMSE1",type="l") # first plot
+plot(0:10,RMSE.LOOCV1,xlab="Complexity",ylab="RMSE1",type="l") # first plot
 par(new = TRUE)
-plot(0:10,RMSE.cv2, type = "l", axes = FALSE, bty = "n", xlab = "", ylab = "",col=2)
-axis(side=4, at = pretty(range(RMSE.test2)))
+plot(0:10,RMSE.LOOCV2, main="LOOCV",type = "l", axes = FALSE, bty = "n", xlab = "", ylab = "",col=2)
+axis(side=4, at = pretty(range(RMSE.LOOCV2)))
 mtext("RMSE2", side=4, line=3)
 ```
+
+# Problem 3
+
+## a)
+
+## b)
+The design matrix will have the form 
+$$
+\mathbf{X} =
+\begin{bmatrix}
+x_{11} & x_{12} & \dots & x_{1k} \\
+x_{21} & x_{22} & \dots & x_{2k} \\
+\vdots & \vdots & \ddots & \vdots \\
+x_{n1} & \dots & \dots & x_{nk}
+\end{bmatrix}
+$$
+We can then look at an arbitrary element of the product matrix \text{$\mathbf{X}^T \mathbf{X}$}. This will result in the sum of the products of the i'th row in \text{$\mathbf{X}^T$} and the j'th row in \text{$\mathbf{X}$}
+
+$$
+[\mathbf{X}^T \mathbf{X}]_{ij} = \sum_{l = 1}^{n} x_{il}x_{lj} 
+$$
+
+Both \text{$x_{il}$} and \text{$x_{lj}$} can be equal to 1, but if \text{$i \neq j$} they will never both be one, and thus the sum equals 0 (for \text{$i \neq j$}). For \text{$i=j$}, \text{$x_{il} = x_{li} = 1$} if \text{$c_i = j$} and thus the sum will count the number of appearances of variable \text{$c_i$}, the final result is then 
+
+$$
+[\mathbf{X}^T \mathbf{X}]_{ij} = \begin{cases} 
+n_j \quad\text{if}\quad i=j \quad \text{where}\quad j=1,2,...,K\\
+0   \quad\hspace{6px}\text{if}\quad i\neq j
+\end{cases}
+$$
+We will also calculate \text{$\mathbf{X}^T \mathbf{y}$}. We can again look at an arbitrary element of the vector \text{$\mathbf{X}^T y$}, summing over the product of each row in \text{$\mathbf{X}^T$} and \text{$\mathbf{y}$}. 
+
+$$
+[\mathbf{X}^T \mathbf{y}]_{j} = \sum_{l=1}^{n} x_{li} y_{l}
+$$
+Again \text{$x_{li}$} will be 1 if \text{$c_i = j$} and zero otherwise, thus effectively each row is the sum of the response \text{$y_j$} corresponding to this explanatory variable.
