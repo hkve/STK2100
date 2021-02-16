@@ -8,7 +8,7 @@ output: pdf_document
 # Problem 1
 ## a)
 
-First we need to load the data. The code sample for loading did not work for me (got a 400 bad request error). Assuming the datafile "nuclear.dat" is located in the same folder as this file, we load the data and attach it for easier use.
+First we need to load the data. The code sample for loading did not work for me (got a 400 bad request error). Assuming the data file "nuclear.dat" is located in the same folder as this file, we load the data and attach it for easier use.
 
 ```{r}
 nuclear = read.table("nuclear.dat", sep="\t", header=T)
@@ -318,6 +318,18 @@ mtext("RMSE2", side=4, line=3)
 
 ## a)
 
+\text{$Y_i$} is the response for the i'th data point, and each data point is a row of zeroes, except where \text{$c_i = j$}. Looking at the two models we first set \text{$x_{i1} = 1$}, and thus all other \text{$x_{ij} = 0$ for $ j = 2, 3, ... K$}. If the two models are equal, this implies that \text{$\beta_0 = \alpha_1$}. Setting \text{$x_{i2} = 1$} giving all other \text{$x_{ij} = 0$ for $ j = 1, 3, 4, ... K$} and thus \text{$\beta_0 + \beta_2 = \alpha_2$}. We can do this in general setting \text{$x_{il} = 1$}  thus \text{$x_{ij} = 0$ for $ j = 1, 2, ... , l-1, l+1, ... ,K$} giving the relationship \text{$\beta_j + \beta_0 = \alpha_j$}. The relationship between the \text{$\alpha$} and \text{$\beta$} coefficients is thus.
+
+$$
+\beta_j = \begin{cases}
+\alpha_1 \quad\quad\quad\hspace{3px}\text{if}\quad j=0 \\
+\alpha_j - \alpha_0 \quad\text{if}\quad j=2,3,...,K
+\end{cases}
+$$
+The interpretation of this is that the \text{$\beta$} model has category \text{$c_j=1$} as a baseline, corresponding to the coefficient that is always present no matter the value of \text{$x_{ij}$} (\text{$\beta_0$}). For this model all other \text{$\beta_j$} is the response \text{$y_i$} from category \text{$c_i = j$} \textit{relative} to category \text{$c_i = 1$}.
+
+The \text{$\alpha$} model on the other hand, does not have this baseline value. The coefficients \text{$\alpha_j$} corresponding to category \text{$c_i = j$} is the response \text{$y_i$}, with no baseline (or zero as a baseline).  
+
 ## b)
 The design matrix will have the form 
 $$
@@ -349,3 +361,79 @@ $$
 [\mathbf{X}^T \mathbf{y}]_{j} = \sum_{l=1}^{n} x_{li} y_{l}
 $$
 Again \text{$x_{li}$} will be 1 if \text{$c_i = j$} and zero otherwise, thus effectively each row is the sum of the response \text{$y_j$} corresponding to this explanatory variable.
+
+To find the least-squares estimate we make use of the general formula \text{$\hat{\boldsymbol{\alpha}} = (\mathbf{X}^T \mathbf{X})^{-1}\mathbf{X}^T\mathbf{y}$}. As \text{$\mathbf{X}^T\mathbf{X}$} is a diagonal matrix, inverting this will only result in a diagonal matrix with elements \text{$[(\mathbf{X}^T \mathbf{X})^{-1}]_{jj} = 1/n_j$}. We have already calculated \text{$\mathbf{X}^T \mathbf{y}$} so the least-squares estimate is then
+
+$$
+[\hat{\boldsymbol{\alpha}}]_{j} = \frac{1}{n_j} \sum_{l=1}^{n} x_{li}y_l
+$$
+
+\text{$\hat{\boldsymbol{\alpha}}$} is then a vector where each row \text{$j$} is the mean of the response corresponding to category \text{$c_i = j$}. 
+
+## c)
+
+Using the relationship from a) we find that the first coefficient \text{$\hat{\beta_0}$} is.
+
+$$
+[\hat{\boldsymbol{\beta}}]_0 = [\hat{\boldsymbol{\alpha}}]_1 = \frac{1}{n_1} \sum_{l=1}^{n} x_{l1}y_{l}
+$$
+
+The other coefficients then follow 
+
+$$
+[\hat{\boldsymbol{\beta}}]_j = [\hat{\boldsymbol{\alpha}}]_j - [\hat{\boldsymbol{\alpha}}]_1= \frac{1}{n_j} \sum_{l=1}^{n} x_{lj}y_{l} -\frac{1}{n_1} \sum_{l=1}^{n} x_{l1}y_{l}
+$$
+
+Since this is a 1-to-1 mapping of the coefficients, this also has to be the least-squares estimate for \text{$\boldsymbol{\beta}$}.
+
+## d)
+Since the two models should be equal, we demand that the sum over all the coefficients should be equal. 
+
+$$
+\sum_{j=1}^{K} \alpha_j = \sum_{j=1}^{K} \left( \gamma_0 + \gamma_j \right) = k\gamma_0 + \sum_{j=1}^{K} \gamma_j
+$$
+The sum over all \text{$\gamma_j$} is equal to zero by assumption, and thus the baseline for this \text{$\gamma$} model is.
+
+$$
+\gamma_0 = \frac{1}{k} \sum_{j=1}^{K} \alpha_j = \bar{\alpha}
+$$
+ Representing the average over all the \text{$\alpha$} coefficients. By the same argument as in a), we set one \text{$x_{il} = 1$} with all other \text{$x_{ij}$ for $j = 1, 2, ... , l-1, l+1, ..., K$} equal to zero and find the relation.
+ 
+ $$
+ \alpha_l = \gamma_0 + \gamma_l \\ \gamma_l = \alpha_l - \gamma_0 = \alpha_l - \bar{\alpha} 
+ $$
+ The \text{$\gamma_l$}'s are now the contribution to the response, relative to the average response, not some arbitrary category \text{$c_i = 1$} as for the \text{$\beta$}'s.
+ 
+ ## e)
+ Again the code provided did not work for me, so assuming the data file \texttt{fe.txt} is located in the same folder we load in the data and preform fit1.
+ 
+```{r}
+Fe = read.table("fe.txt", header=T, sep=",")
+fit1= lm(Fe~form+0, data=Fe)
+summary(fit1)
+```
+ 
+This is not a good idea, since we want R to recognize that form is a categorical variable. If not done, it will try to fit \texttt{Fe} against the numerical x-values 1,2,3,4. Thus we make sure the \texttt{form} variable is a regonzied as a factor. 
+
+```{r}
+Fe$form = as.factor(Fe$form)
+fit1 = lm(Fe~form+0, data=Fe)
+summary(fit1)
+```
+ This result is more reasonable as each of the 4 categories has its own coefficient. The actual numerical values 1,2,3,4 does not effect the model which was the case before we made them categorical. In the \textt{lm} command, we enforced the fit to not include a intercept (+0). This implies that this fit corresponds to a model that does not have any baseline (or a baseline of zero). It is thus the \text{$\alpha$} model.
+ 
+## f)
+ 
+```{r}
+options()$contrasts
+options(contrasts=c("contr.treatment", "contr.treatment"))
+fit2 = lm(Fe~form,data=Fe)
+summary(fit2)
+
+options(contrasts=c("contr.sum", "contr.sum"))
+options()$contrasts
+fit3 = lm(Fe~form,data=Fe)
+summary(fit3)
+```
+  
+ 
