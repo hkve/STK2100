@@ -6,7 +6,7 @@ X = rnorm(n)
 epsilon = rnorm(n)
 
 # Actual model coefs
-b_true = c(2,-3,0.5,0.25)
+b_true = c(1,1,1,0.25)
 
 # Predictions with noise
 Y = b_true[1] + b_true[2]*X + b_true[3]*X^2 + b_true[4]*X^3 + epsilon
