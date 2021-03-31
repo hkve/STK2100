@@ -16,7 +16,7 @@ We begin by loading the data and saving it to the \texttt{spam} data-frame. We a
 ```{r}
 fil = "https://www.uio.no/studier/emner/matnat/math/STK2100/data/spam_data.txt"
 spam = read.table(fil, header=T)
-
+fix(spam)
 library(MASS)
 ```
 
@@ -72,8 +72,10 @@ We will now try to increase the number of principal components in our logistic r
 min_pc = 2
 max_pc = 57
 n_pc = max_pc-min_pc+1
-FP_vec = seq(min_pc,max_pc, length.out = n_pc)
-FN_vec = seq(min_pc,max_pc, length.out = n_pc)
+n_pc_vec = seq(min_pc, max_pc, length.out = n_pc)
+FP_vec = seq(0, 0, length.out = n_pc)
+FN_vec = seq(0, 0, length.out = n_pc)
+var_sum_vec = seq(0, 0, length.out = n_pc)
 
 for( i in 1:n_pc) {
   k = i+1
@@ -82,19 +84,38 @@ for( i in 1:n_pc) {
   fit.temp.confusion_mat = table(pred.temp, d$y[!d$train])
   FP_vec[i] = fit.temp.confusion_mat[2,1]/length(d$y[!d$train] == F) 
   FN_vec[i] = fit.temp.confusion_mat[1,2]/length(d$y[!d$train] == T)
+  var_sum_vec[i] = sum(x.prcomp$sdev[1:k]^2)
 }
 
+var_sum_vec = var_sum_vec/sum(x.prcomp$sdev^2)
 cols = c("blue", "red")
-
 plot.new()
-plot(FN_vec*100, type="l", col=cols[1], axes=FALSE, xlab="# of principal components", ylab="%")
+plot(n_pc_vec, FN_vec*100, type="l", col=cols[1], axes=FALSE, xlab="# of principal components", ylab="%")
 par(new=TRUE)
-plot(FP_vec*100, type="l", col=cols[2], xlab="", ylab="")
+plot(n_pc_vec, FP_vec*100, type="l", col=cols[2], xlab="", ylab="")
 legend("topright", c("FN","FP"), fill=cols, bty="n")
+```
+
+How many to use? Dependes, reason is to decrease dimensionality so should prob use less. cumulative sum?
+
+```{r}
+plot(n_pc_vec, var_sum_vec, type="l")
 ```
 
 # d)
 
 ```{r}
-plot.ts(x.prcomp$rotation[,1])
+n = 3
+cols = rainbow(n)
+for( i in 1:n ) {
+  plot.ts(x.prcomp$rotation[,i], type="p", col=cols[i]) # Plot components x1, ... , x57 of the i'th PC 
+  par(new=T)
+}
+```
+
+# e)
+```{r}
+library(gam)
+fit.gam = gam(y~s(x1)+s(x2)+s(x3), data=spam, subset =spam$train, family = binomial)
+pred.gam = predict(fit.gam, spam[!spam$train, ], type="response") > 0.5
 ```
