@@ -16,7 +16,6 @@ We begin by loading the data and saving it to the \texttt{spam} data-frame. We a
 ```{r}
 fil = "https://www.uio.no/studier/emner/matnat/math/STK2100/data/spam_data.txt"
 spam = read.table(fil, header=T)
-fix(spam)
 library(MASS)
 ```
 
@@ -27,19 +26,41 @@ fit = glm(y~.-train, data=spam, subset=spam$train, family = binomial)
 pred = predict(fit, spam[!spam$train,], type="response")>0.5
 ```
 
-The most natural measure to use for prediction performance is to compute the confusion matrix. We will also compute the percentage of false positives (FP) and false negatives (FN).
+The most natural measure to use for prediction performance is to compute the confusion matrix. This is a $2 \times 2$ matrix with TN (true negative) and TP (true positive) on the diagonal. The element below the diagonal is FN (false negative) and above the diagonal FP (false positive). To make our measure more concise and direct we will calculate the TPR (true positive rate) and TNR (true negative rate). These are defined as 
+
+$$
+\text{Confusion matrix: } \left(\begin{array}{cc} 
+TN & FN\\
+FP & TP
+\end{array}\right) \\
+TPR = \frac{TP}{TP+FN} \hspace{20px}\text{and}\hspace{20px} TNR = \frac{TN}{TN+FP}
+$$
+
+We aim to have both TPR and TNR close to one. If TPR = 1 we have no false negatives and if TNR = 1 we have no false positives. If FN = TP and TN = FP we have TPR = 0.5 and TNR = 0.5 and the models preforms no better than guessing. We compute the confusion matrix and make a function to calculate TPR/TNR as we will use them a lot. 
 
 ```{r}
 fit.confusion_mat = table(pred, spam$y[!spam$train])
+
+set_dec = function(x, k) trimws(format(round(x, k), nsmall=k))
+true_PN_rate = function (mat, dec=4, display=F) {
+  TPR = mat[2,2]/(mat[2,2]+mat[1,2])
+  TNR = mat[1,1]/(mat[1,1]+mat[2,1])
+  
+  if(display) {
+    paste("TPR = ", set_dec(TPR, dec), "TNR = ", set_dec(TNR, dec))
+  }
+  else {
+    c(TPR, TNR) 
+  }
+}
+
 fit.confusion_mat # Print confusion matrix
-fit.FP = fit.confusion_mat[2,1]/length(spam$y[!spam$train] == T) # Compute % of false positives
-fit.FN = fit.confusion_mat[1,2]/length(spam$y[!spam$train] == F)# Compute % of false negatives
-sprintf("FP: %.3f, FN: %.3f", fit.FP, fit.FN)
+print(true_PN_rate(fit.confusion_mat, display=T))
 ```
-We see that the logistic regression using all the explanatory variables does a fairly good job. In about 4% of cases it labels the data as spam, even though it is not (FP) and in about 5% of cases it does not label the data as spam even though it is (FN). 
+Thus  $TPR \approx 0.88$ and $TNR \approx 0.94$. How accurate it needs to be is dependent on the application, but we can probably obtain better results using a more complex model. The goal of a spam filter is to hide unwanted emails from the users inbox. Two or three spam emails slipping trough is not the end of the world, but we should defiantly try to avoid marking an actual email as spam (FP) since it migth contain important information such as a change in flight times or your rent bill. Thus the most important measure for our purposes is to maximize the TNR.  
 
 # b)
-We have $p = 57$ explanatory variables. To reduce the dimensionality of the data while keeping as much of the origional relationships as possible, we compute the principle components.
+We have $p = 57$ explanatory variables. To reduce the dimensionality of the data while keeping as much of the original relationships as possible, we compute the principle components.
 
 ```{r}
 x.prcomp = prcomp(spam[,1:57], retx=T, scale=T)
@@ -54,12 +75,11 @@ We then preform the logistic regression using the 2 first principal components.
 fit.pc = glm(y~.-train, data=d[, c(1:2, 58,59)], family = binomial, subset=d$train)
 pred.pc = predict(fit.pc, d[!d$train, ], type="response")>0.5
 fit.pc.confusion_mat = table(pred.pc, d$y[!d$train])
+
 fit.pc.confusion_mat
-fit.pc.FP = fit.pc.confusion_mat[2,1]/length(d$y[!d$train] == T) # Compute % of false positives
-fit.pc.FN = fit.pc.confusion_mat[1,2]/length(d$y[!d$train] == F)# Compute % of false negatives
-sprintf("FP: %.3f, FN: %.3f", fit.pc.FP, fit.pc.FN)
+print(true_PN_rate(fit.pc.confusion_mat, display=T))
 ```
-We see that both FP and FN increases. FP increases slightly from 3.7% to 4.1% and FN increases quite a lot from 4.8% to 9.1%. This is somewhat excepted as we have only included the two first principal components. These are the most important components, but does not necessarily contain as much of the relationship between the explanatory variables and the target as all the 57 "raw" explanatory variables. This can be seen for instance by printing out the 5 largest principal components (square root of the eigenvalues of the covariance matrix)
+We observe that FN increases quite a lot an thus we end up with $TPR \approx 0.77$. FP (the one we are most worried about) increases just slightly resulting in $TNR \approx 0.93$. These are the most important components, but does not necessarily contain as much of the relationship between the explanatory variables and the target as all the 57 "raw" explanatory variables. This can be seen for instance by printing out the 5 largest principal components (square root of the eigenvalues of the covariance matrix)
 ```{r}
 x.prcomp$sdev[1:5]
 ```
@@ -73,8 +93,8 @@ min_pc = 2
 max_pc = 57
 n_pc = max_pc-min_pc+1
 n_pc_vec = seq(min_pc, max_pc, length.out = n_pc)
-FP_vec = seq(0, 0, length.out = n_pc)
-FN_vec = seq(0, 0, length.out = n_pc)
+TPR_vec = seq(0, 0, length.out = n_pc)
+TNR_vec = seq(0, 0, length.out = n_pc)
 var_sum_vec = seq(0, 0, length.out = n_pc)
 
 for( i in 1:n_pc) {
@@ -82,18 +102,18 @@ for( i in 1:n_pc) {
   fit.temp = glm(y~.-train, data=d[, c(1:k, 58,59)], family = binomial, subset=d$train)
   pred.temp = predict(fit.temp, d[!d$train, ], type="response")>0.5
   fit.temp.confusion_mat = table(pred.temp, d$y[!d$train])
-  FP_vec[i] = fit.temp.confusion_mat[2,1]/length(d$y[!d$train] == F) 
-  FN_vec[i] = fit.temp.confusion_mat[1,2]/length(d$y[!d$train] == T)
+  TR = true_PN_rate(fit.temp.confusion_mat)
+  TPR_vec[i] = TR[1]
+  TNR_vec[i] = TR[2]
   var_sum_vec[i] = sum(x.prcomp$sdev[1:k]^2)
 }
 
 var_sum_vec = var_sum_vec/sum(x.prcomp$sdev^2)
 cols = c("blue", "red")
-plot.new()
-plot(n_pc_vec, FN_vec*100, type="l", col=cols[1], axes=FALSE, xlab="# of principal components", ylab="%")
+plot(n_pc_vec, TPR_vec, type="l", col=cols[1], axes=FALSE, xlab="# of principal components")
 par(new=TRUE)
-plot(n_pc_vec, FP_vec*100, type="l", col=cols[2], xlab="", ylab="")
-legend("topright", c("FN","FP"), fill=cols, bty="n")
+plot(n_pc_vec, TNR_vec, type="l", col=cols[2], xlab="", ylab="")
+legend("bottomright", c("TPR","TNR"), fill=cols, bty="n")
 ```
 
 How many to use? Dependes, reason is to decrease dimensionality so should prob use less. cumulative sum?
@@ -103,19 +123,67 @@ plot(n_pc_vec, var_sum_vec, type="l")
 ```
 
 # d)
+When using the most important principal components we are granted with new variables that explain more of the data than the original variables. These new variables are linear combinations of the original variables, so the trade off is that we loose some interpretation of the model. Some analysis of the principal components is thus desired to achieve better interpretability. Since we use quite a lot of principal components, deep diving into the structure of each of these will be time consuming so we will here focus on the 4 most important (with the largest eigenvalue).
 
-```{r}
-n = 3
+Each principal component will have 57 coefficients corresponding to the 57 explanatory variables. Some will be large (meaning this variable is important for this principal component) and some small or (very close to) zero (meaning this variable is \textbf{not} important to this principal component). To pick out the "large" components we plot for each principal component the coefficients that are larger than the mean of the absolute value of all the coefficients for that principal component. All other coefficients are "small" and are plotted as crosses, while the "large" ones are plotted as colored circles. The solid line is zero while the two dotted lines are $\pm$ the mean of the absolute value of the coefficients.   
+```{r, fig.width=7, fig.height=7}
+n = 4
 cols = rainbow(n)
+par(mfrow=c(2,2), oma=c(2,2,0,0))
 for( i in 1:n ) {
-  plot.ts(x.prcomp$rotation[,i], type="p", col=cols[i]) # Plot components x1, ... , x57 of the i'th PC 
+  avrg_coef_size = mean(abs(x.prcomp$rotation[,i]))
+  pc.eig= x.prcomp$rotation[,i]
+  pc.eig.large = pc.eig[abs(pc.eig) > avrg_coef_size]
+  pc.eig.small = pc.eig[abs(pc.eig) < avrg_coef_size]
+  plot.ts(pc.eig.large, type="p", col=cols[i], ylab="", main=paste("PC ", i), xlab="", pch=19, ylim=c(-0.5,0.5)) 
   par(new=T)
+  plot.ts(pc.eig.small, type="p",pch=4, cex=0.6,  yaxt="n", xaxt="n",ann=F, ylim=c(-0.5,0.5)) 
+  abline(0,0)
+  abline(avrg_coef_size, 0, lty="dotted")
+  abline(-avrg_coef_size, 0, lty="dotted")
 }
+
+mtext("Explanatory variable (index 1 to 57)", side=1, line=0, outer=T, cex=1.3)
+mtext("Coefficient size", side=2, line=0, cex=1.3, outer=T)
 ```
+To interpret this we quickly summarize what each explanatory variable means. 
 
 # e)
+We now try some non-linear models. First we fit the model using the 3 first explanatory variables using smoothing splines with 4 degrees of freedom. Then we use the same 3 explanatory variables to fit a logistic regression model. We can then check if these non-linear terms yields any improvements.     
 ```{r}
 library(gam)
-fit.gam = gam(y~s(x1)+s(x2)+s(x3), data=spam, subset =spam$train, family = binomial)
+
+fit.gam = gam(y~s(x1)+s(x2)+s(x3), data=spam, subset =spam$train, family = binomial) # Smoothing spline model
+fit.log = gam(y~x1+x2+x3, data=spam, subset=spam$train, family = binomial) # Logistic regression
+
 pred.gam = predict(fit.gam, spam[!spam$train, ], type="response") > 0.5
+pred.log = predict(fit.log, spam[!spam$train, ], type="response") > 0.5
+
+confusion.gam = table(pred.gam, spam$y[!d$train])
+confusion.log = table(pred.log, spam$y[!d$train])
+
+print(paste("Natural Splines -> ", true_PN_rate(confusion.gam, display = T)))
+confusion.gam
+
+print(paste("Logistic regression -> ", true_PN_rate(confusion.log, display = T)))
+confusion.log
 ```
+Both suck idk why (except 3 vars...).
+
+```{r}
+par(mfrow=c(1,3))
+plot(fit.gam, se=T)
+```
+
+## f)
+
+```{r}
+fit.pc.gam = gam(y~s(PC1)+s(PC2)+s(PC3), data=d, subset=d$train, family=binomial)
+pred.pc.gam = predict(fit.pc.gam, d[!spam$train, ], type="response") > 0.5
+
+confusion.pc.gam = table(pred.pc.gam, spam$y[!spam$train])
+
+print(paste("PC gam ->", true_PN_rate(confusion.pc.gam, display=T)))
+```
+
+Waaaay better :) 
