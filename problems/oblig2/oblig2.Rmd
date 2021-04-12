@@ -57,7 +57,7 @@ true_PN_rate = function (mat, dec=4, display=F) {
 fit.confusion_mat # Print confusion matrix
 print(true_PN_rate(fit.confusion_mat, display=T))
 ```
-Thus  $TPR \approx 0.88$ and $TNR \approx 0.94$. How accurate it needs to be is dependent on the application, but we can probably obtain better results using a more complex model. The goal of a spam filter is to hide unwanted emails from the users inbox. Two or three spam emails slipping trough is not the end of the world, but we should defiantly try to avoid marking an actual email as spam (FP) since it migth contain important information such as a change in flight times or your rent bill. Thus the most important measure for our purposes is to maximize the TNR.  
+Thus  $TPR \approx 0.88$ and $TNR \approx 0.94$. How accurate it needs to be is dependent on the application, but we can probably obtain better results using a more complex model. The goal of a spam filter is to hide unwanted emails from the users inbox. Two or three spam emails slipping trough is not the end of the world, but we should defiantly try to avoid marking an actual email as spam (FP) since it migth contain important information such as a change in flight times or your power bill. Thus the most important measure for our purposes is to maximize the TNR.  
 
 # b)
 We have $p = 57$ explanatory variables. To reduce the dimensionality of the data while keeping as much of the original relationships as possible, we compute the principle components.
@@ -110,7 +110,7 @@ for( i in 1:n_pc) {
 
 var_sum_vec = var_sum_vec/sum(x.prcomp$sdev^2)
 cols = c("blue", "red")
-plot(n_pc_vec, TPR_vec, type="l", col=cols[1], axes=FALSE, xlab="# of principal components")
+plot(n_pc_vec, TPR_vec, type="l", col=cols[1], axes=FALSE, xlab="# of principal components", ylab="")
 par(new=TRUE)
 plot(n_pc_vec, TNR_vec, type="l", col=cols[2], xlab="", ylab="")
 legend("bottomright", c("TPR","TNR"), fill=cols, bty="n")
@@ -133,11 +133,16 @@ par(mfrow=c(2,2), oma=c(2,2,0,0))
 for( i in 1:n ) {
   avrg_coef_size = mean(abs(x.prcomp$rotation[,i]))
   pc.eig= x.prcomp$rotation[,i]
+  
+  pc.x = seq(1, length(pc.eig), length.out = length(pc.eig))
   pc.eig.large = pc.eig[abs(pc.eig) > avrg_coef_size]
+  pc.x.large = pc.x[abs(pc.eig) > avrg_coef_size]
   pc.eig.small = pc.eig[abs(pc.eig) < avrg_coef_size]
-  plot.ts(pc.eig.large, type="p", col=cols[i], ylab="", main=paste("PC ", i), xlab="", pch=19, ylim=c(-0.5,0.5)) 
+  pc.x.small = pc.x[abs(pc.eig) < avrg_coef_size]
+  
+  plot(pc.x.large, pc.eig.large, type="p", col=cols[i], ylab="", main=paste("PC ", i), xlab="", pch=19, ylim=c(-0.5,0.5)) 
   par(new=T)
-  plot.ts(pc.eig.small, type="p",pch=4, cex=0.6,  yaxt="n", xaxt="n",ann=F, ylim=c(-0.5,0.5)) 
+  plot(pc.x.small, pc.eig.small, type="p",pch=4, cex=0.6,  yaxt="n", xaxt="n",ann=F, ylim=c(-0.5,0.5)) 
   abline(0,0)
   abline(avrg_coef_size, 0, lty="dotted")
   abline(-avrg_coef_size, 0, lty="dotted")
@@ -146,7 +151,14 @@ for( i in 1:n ) {
 mtext("Explanatory variable (index 1 to 57)", side=1, line=0, outer=T, cex=1.3)
 mtext("Coefficient size", side=2, line=0, cex=1.3, outer=T)
 ```
-To interpret this we quickly summarize what each explanatory variable means. 
+To interpret this we quickly summarize what each explanatory variable means. The first 48 variables correspond to the frequency of a specific word (\textbf{\# specific word}/\textbf{\# total words} $\times 100$). This checks for common spam words such as "money" and "free". The six variables (49 to 54) checks for the frequency of specific charters (\textbf{\# character} / \textbf{\t total characters} $\times 100$). The last three measures use of capital letters in different forms. From this we can give a vague intepretation of the 4 most important principal compoenents.
+
+\begin{enumerate}
+\item Contains mostly specific words (from the 48 first variables). In addition it contains the 50 variable meaning some specific character is important
+\item Again a lot of different words (from the 48 first variables), but with little overlap with the first principal component. In addition the variables 52, 53, 55, 56 and 57 are also included. The first two (52, 53) correspond to some specific character (not the same as the first principal component) while the last three correspond to different occurrences of words in capital letters. 
+\item This again includes mostly specific words but again some specific characters and capital letters are important. All the variables corresponding to capital letters are duplicates of the second principal component
+\item This is very similar to the third and second principal components. Some specific words are important, in addition to specific characters and words in capital letters. 
+\end{enumerate}
 
 # e)
 We now try some non-linear models. First we fit the model using the 3 first explanatory variables using smoothing splines with 4 degrees of freedom. Then we use the same 3 explanatory variables to fit a logistic regression model. We can then check if these non-linear terms yields any improvements.     
@@ -168,22 +180,95 @@ confusion.gam
 print(paste("Logistic regression -> ", true_PN_rate(confusion.log, display = T)))
 confusion.log
 ```
-Both suck idk why (except 3 vars...).
+We can see that the results are drastically worse than the approach using many principal components. The logistic regression actually had a higher TNR than the natural splines, but the TPR of logistic regression is very bad. There might be some improvement as the TPR is higher for the splines, but the TPR is still $\approx 0.47$ so it is actually worse than guessing. Deciding if there is any definite benefit for including a more complex relationship between the explanatory variables and the target is not feasible when we restrict ourselves to only using 3 variables. 
 
+This is actually not too surprising, as we have arbitrarily chosen three explanatory variables to predict whether or not an e-mail can be classified as spam. There is not necessarily anything specifically interesting about these 3 variables. I think I would have a hard time deciding if an e-mail  was spam or not if I were only allowed to see the frequency of three words!
+
+We should take a closer look how the splines behave as a function of the explanatory variables. Below we see a plot of each spline polynomial for each of the three variables. It becomes clear that a lot of the data points contains close to zero or zero entries, such that for any large value of $x_1, x_2$ or $x_3$ the standard error is very large. 
 ```{r}
 par(mfrow=c(1,3))
 plot(fit.gam, se=T)
 ```
 
+We can also make a histogram for each of the three variables. This is seen below. In the title the percentage of non-zero entries for each variable is presented. The amount of "large" values for these explanatory variables (frequency of a specific word in this case) are few and it is thus difficult to fit for these values. Thus the standard error for each spline (displayed above) for large values goes off the charts. This is an indication that our data is very sparse, confirmed by that only 23\%, 20\% and 41\% of entries for the first, second and third explanatory variable respectively, are non-zero, 
+```{r}
+par(mfrow=c(1,3))
+
+for(i in 1:3) {
+  nonzero = 100*length(spam[,i][spam[,i] != 0])/length(spam[,i])
+  hist(spam[,i], breaks=20, xlab="Occurrence %", main=paste("x", i, " Non-zero:", set_dec(nonzero, 1), "%", sep=""))
+}
+```
+
 ## f)
+We will now repeat the process from \textbf{e} but instead of using the first three explanatory variables, we will use the first three principal components. Again we make one model using natural splines with 4 degrees of freedom and one using linear terms.
 
 ```{r}
 fit.pc.gam = gam(y~s(PC1)+s(PC2)+s(PC3), data=d, subset=d$train, family=binomial)
+fit.pc.log = gam(y~PC1+PC2+PC3, data=d, subset=d$train, family=binomial)
+
 pred.pc.gam = predict(fit.pc.gam, d[!spam$train, ], type="response") > 0.5
+pred.pc.log = predict(fit.pc.log, d[!spam$train, ], type="response") > 0.5
 
 confusion.pc.gam = table(pred.pc.gam, spam$y[!spam$train])
+confusion.pc.log = table(pred.pc.log, spam$y[!spam$train])
 
 print(paste("PC gam ->", true_PN_rate(confusion.pc.gam, display=T)))
+confusion.pc.gam
+
+print(paste("PC log ->", true_PN_rate(confusion.pc.log, display=T)))
+confusion.pc.log
 ```
 
 Waaaay better :) 
+
+```{r}
+par(mfrow=c(1,3))
+plot(fit.pc.gam, se=T)
+```
+
+## g)
+
+```{r}
+nam = names(d)[1:57]
+k = 20
+formula = as.formula(paste("y", paste(paste("s(", nam[1:k], ")", sep=""), collapse = "+"), sep="~"))
+print(formula)
+
+fit.gam.pc = gam(formula, data=d, subset = d$train, family = binomial)
+pred.pc.gam = predict(fit.gam.pc, d[!d$train,], type="response") > 0.5
+
+confusion.pc.gam = table(pred.pc.gam, spam$y[!spam$train])
+
+print(true_PN_rate(confusion.pc.gam, display = T))
+```
+
+## h)
+
+```{r, warning=F}
+min_pc = 2
+max_pc = 57
+n_pc = max_pc-min_pc+1
+n_pc_vec = seq(min_pc, max_pc, length.out = n_pc)
+TPR_vec = seq(0, 0, length.out = n_pc)
+TNR_vec = seq(0, 0, length.out = n_pc)
+
+for( i in 1:n_pc) {
+  k = i+1
+  formula = as.formula(paste("y", paste(paste("s(", nam[1:k], ")", sep=""), collapse = "+"), sep="~"))
+  fit.temp = gam(formula, data=d[, c(1:k, 58,59)], family = binomial, subset=d$train)
+  pred.temp = predict(fit.temp, d[!d$train, ], type="response")>0.5
+  fit.temp.confusion_mat = table(pred.temp, d$y[!d$train])
+  TR = true_PN_rate(fit.temp.confusion_mat)
+  TPR_vec[i] = TR[1]
+  TNR_vec[i] = TR[2]
+}
+
+var_sum_vec = var_sum_vec/sum(x.prcomp$sdev^2)
+cols = c("blue", "red")
+plot(n_pc_vec, TPR_vec, type="l", col=cols[1], axes=FALSE, xlab="# of principal components", ylab="")
+par(new=TRUE)
+plot(n_pc_vec, TNR_vec, type="l", col=cols[2], xlab="", ylab="")
+legend("bottomright", c("TPR","TNR"), fill=cols, bty="n")
+
+```
