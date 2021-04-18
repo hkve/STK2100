@@ -19,9 +19,9 @@ spam = read.table(fil, header=T)
 library(MASS)
 ```
 
-We now preform a logistic regression on the training data, using all the explanatory variables. The \texttt{train} column only indicates if the data point should be used for training, so we do not include this variable in our fit, but rather use it as a subset to preform the fit.
+We now preform a logistic regression on the training data, using all the explanatory variables. The \texttt{train} column only indicates if the data point should be used for training, so we do not include this variable in our fit, but rather use it to select a subset to preform the fit.
 
-```{r}
+```{r, warning=F}
 fit = glm(y~.-train, data=spam, subset=spam$train, family = binomial)
 pred = predict(fit, spam[!spam$train,], type="response")>0.5
 ```
@@ -33,10 +33,10 @@ $$
 TN & FN\\
 FP & TP
 \end{array}\right) \\
-TPR = \frac{TP}{TP+FN} \hspace{20px}\text{and}\hspace{20px} TNR = \frac{TN}{TN+FP}
+\hspace{20px} TPR = \frac{TP}{TP+FN} \hspace{20px}\text{and}\hspace{20px} TNR = \frac{TN}{TN+FP}
 $$
 
-We aim to have both TPR and TNR close to one. If TPR = 1 we have no false negatives and if TNR = 1 we have no false positives. If FN = TP and TN = FP we have TPR = 0.5 and TNR = 0.5 and the models preforms no better than guessing. We compute the confusion matrix and make a function to calculate TPR/TNR as we will use them a lot. 
+We aim to have both TPR and TNR close to one. If TPR = 1 we have no false negatives and if TNR = 1 we have no false positives. If FN = TP and TN = FP we have TPR = 0.5 and TNR = 0.5. This means that the model preforms no better than guessing. We compute the confusion matrix and make a function to calculate TPR/TNR as we will use them a lot. 
 
 ```{r}
 fit.confusion_mat = table(pred, spam$y[!spam$train])
@@ -79,7 +79,7 @@ fit.pc.confusion_mat = table(pred.pc, d$y[!d$train])
 fit.pc.confusion_mat
 print(true_PN_rate(fit.pc.confusion_mat, display=T))
 ```
-We observe that FN increases quite a lot an thus we end up with $TPR \approx 0.77$. FP (the one we are most worried about) increases just slightly resulting in $TNR \approx 0.93$. These are the most important components, but does not necessarily contain as much of the relationship between the explanatory variables and the target as all the 57 "raw" explanatory variables. This can be seen for instance by printing out the 5 largest principal components (square root of the eigenvalues of the covariance matrix)
+We observe that FN increases quite a lot an thus we end up with $TPR \approx 0.77$. FP (the one we are most worried about) increases just slightly resulting in $TNR \approx 0.93$. These are the most important components, but does not necessarily contain as much of the relationship between the explanatory variables and the target as all the 57 "raw" explanatory variables. This can be seen for instance by printing out the 5 largest principal components standard deviation (square root of the eigenvalues of the covariance matrix)
 ```{r}
 x.prcomp$sdev[1:5]
 ```
@@ -109,14 +109,21 @@ for( i in 1:n_pc) {
 }
 
 var_sum_vec = var_sum_vec/sum(x.prcomp$sdev^2)
+```
+```{r}
 cols = c("blue", "red")
-plot(n_pc_vec, TPR_vec, type="l", col=cols[1], axes=FALSE, xlab="# of principal components", ylab="")
+plot(n_pc_vec, TPR_vec, type="l", col=cols[1], xlab="# of principal components", ylab="", axes=FALSE, ylim=c(0.8,1))
 par(new=TRUE)
-plot(n_pc_vec, TNR_vec, type="l", col=cols[2], xlab="", ylab="")
+plot(n_pc_vec, TNR_vec, type="l", col=cols[2], xlab="", ylab="", ylim=c(0.8,1))
 legend("bottomright", c("TPR","TNR"), fill=cols, bty="n")
+
+k = 44
+sprintf("k = %i, TPR %.4f, TNR %.4f", n_pc_vec[k] ,TPR_vec[k], TNR_vec[k])
 ```
 
-We see that about $k=45$ gives the best performance for both TPR and TNR, both ending up a little under $0.95$. This is a fairly good result and is an increase compared with only using the "raw" 57 explanatory variables. However on of the goals using principal components is to reduce the dimensionality. Of course $45 < 57$, but there might be some other modifications we can do to our model with the goal of using fewer explanatory variables. The sum of all the eigenvalues of the covariance matrix correspond to all the variance in our data. We can thus create a cumulative sum over all the $k$th first eigenvalues divided by the sum of all the eigenvalues to get a measure of how much variance the first $k$ principal components contained. We note this as the normalized "energy" $E(k)$ as a function of principal components with $N$ as the total number of principal components.
+From the plot above we see that the TNR is quite stable after about $k=10$, with a little dip after $k=50$. This means that classifying e-mails correctly as not being spam does not require to many principal component. As this is our most important measure, we have a wide range of possible models to choose from. The TPR on the other hand is steadily increasing to about $k=45$, after which it stabilizes somewhat. Since we want a model that both does not wrongly classify e-mails as spam and catches spam e-mails, a model with $k=45$ principal components seems to be the best choice. However one of the goals using principal components is to reduce the dimensionality. Of course $45 < 57$, but there might be some other modifications we can do to our model with the goal of using even fewer principal components.
+
+It might be interesting to examine how much variance is accounted for using $k$ different principal components. The sum of all the eigenvalues of the covariance matrix correspond to all the variance in our data. We can thus create a cumulative sum over all the $k$th first eigenvalues divided by the sum of all the eigenvalues to get a measure of how much variance the first $k$ principal components contained. We note this as the normalized "energy" $E(k)$ as a function of principal components with $N$ as the total number of principal components.
 
 $$
 E(k) = \frac{\sum_{i=1}^{k} \lambda_i} {\sum_{i=1}^{N} \lambda_i}
@@ -158,7 +165,7 @@ for( i in 1:n ) {
 mtext("Explanatory variable (index 1 to 57)", side=1, line=0, outer=T, cex=1.3)
 mtext("Coefficient size", side=2, line=0, cex=1.3, outer=T)
 ```
-To interpret this we quickly summarize what each explanatory variable means. The first 48 variables correspond to the frequency of a specific word (\textbf{\# specific word}/\textbf{\# total words} $\times 100$). This checks for common spam words such as "money" and "free". The six variables (49 to 54) checks for the frequency of specific charters (\textbf{\# character} / \textbf{\t total characters} $\times 100$). The last three measures use of capital letters in different forms. From this we can give a vague intepretation of the 4 most important principal compoenents.
+To interpret this we quickly summarize what each explanatory variable means. The first 48 variables correspond to the frequency of a specific word (\textbf{\# specific word}/\textbf{\# total words} $\times 100$). This checks for common spam words such as "money" and "free". The six variables (49 to 54) checks for the frequency of specific charters (\textbf{\# character} / \textbf{\# total characters} $\times 100$). The last three measures use of capital letters in different forms. From this we can give a vague intepretation of the 4 most important principal compoenents.
 
 \begin{enumerate}
 \item Contains mostly specific words (from the 48 first variables). In addition it contains the 50 variable meaning some specific character is important
@@ -254,33 +261,76 @@ print(true_PN_rate(confusion.pc.gam, display = T))
 ```
 
 We see a good performance for both TPR and TNR. $TNR \approx 0.96$ assures that very few e-mails will be labeled as spam even tough they are not. The TPR is still worse than using $k=45$ with a linear model.
+
 ## h)
+
 Lastly we apply the scheme from \textbf{c}, but this time using the natural splines for all the principal components.
 
-```{r, warning=F}
+```{r warning=FALSE}
 min_pc = 2
 max_pc = 57
 n_pc = max_pc-min_pc+1
 n_pc_vec = seq(min_pc, max_pc, length.out = n_pc)
-TPR_vec = seq(0, 0, length.out = n_pc)
-TNR_vec = seq(0, 0, length.out = n_pc)
+TPR_vec.gam = seq(0, 0, length.out = n_pc)
+TNR_vec.gam = seq(0, 0, length.out = n_pc)
 
 for( i in 1:n_pc) {
   k = i+1
-  formula = as.formula(paste("y", paste(paste("s(", nam[1:k], ")", sep=""), collapse = "+"), sep="~"))
-  # data = d[, c(1:k, 58,59)]
-  fit.temp = gam(formula, data=d, family = binomial, subset=d$train)
-  pred.temp = predict(fit.temp, d[!d$train, ], type="response")>0.5
-  fit.temp.confusion_mat = table(pred.temp, d$y[!d$train])
-  TR = true_PN_rate(fit.temp.confusion_mat)
-  TPR_vec[i] = TR[1]
-  TNR_vec[i] = TR[2]
+  formula = as.formula(paste("y", paste(paste("s(", nam[0:k], ")", sep=""), collapse = "+"), sep="~"))
+  fit.temp.gam = gam(formula, data=d[, c(1:k, 58,59)], family = binomial, subset=d$train)
+  pred.temp.gam = predict(fit.temp.gam, d[!d$train, ], type="response")>0.5
+  fit.temp.confusion_mat.gam = table(pred.temp.gam, d$y[!d$train])
+  TR = true_PN_rate(fit.temp.confusion_mat.gam)
+  TPR_vec.gam[i] = TR[1]
+  TNR_vec.gam[i] = TR[2]
 }
-
-
-cols = c("blue", "red")
-plot(n_pc_vec, TPR_vec, type="l", col=cols[1], axes=FALSE, xlab="# of principal components", ylab="")
-par(new=TRUE)
-plot(n_pc_vec, TNR_vec, type="l", col=cols[2], xlab="", ylab="")
-legend("bottomright", c("TPR","TNR"), fill=cols, bty="n")
 ```
+
+```{r, echo=T}
+cols = c("blue", "red")
+plot(n_pc_vec, TPR_vec.gam, type="l", col=cols[1], xlab="# of principal components", ylab="", axes=F, ylim=c(0.8,1))
+par(new=TRUE)
+plot(n_pc_vec, TNR_vec.gam, type="l", col=cols[2], xlab="", ylab="", ylim=c(0.8,1))
+legend("bottomright", c("TPR","TNR"), fill=cols, bty="n")
+
+k = 24
+sprintf("k = %i, TPR %.4f, TNR %.4f",n_pc_vec[k], TPR_vec.gam[k], TNR_vec.gam[k])
+```
+
+Comparing this to the curves in task \textbf{c}, we see that the TNR curve actually need more principal components to reach the level of $TNR \approx 0.95$. The TPR on the other hand, increases faster than the linear structure. This is an indicator that the non-linear structure gives some small improvement to the overall effectiveness of our model. In addition, since both TPR and TNR stabilizes for lower values of $k$ (compared to the linear structure), this allows us to choose a less complex model containing fewer principal components. The increase in TPR and TNR from $k \approx 20$ to $k \approx 45$ is small from this model so we choose a model of $k=25$ principal components to achieve better model interpretability. 
+
+As in task \textbf{e} and \textbf{f} we can plot the principal components using the function of their natural splines and investigate their standard error. We have chosen $k=25$ principal components, and we will thus have 25 plots. This spans multiple pages. 
+
+```{r}
+formula = as.formula(paste("y", paste(paste("s(", nam[0:k+1], ")", sep=""), collapse = "+"), sep="~"))
+fit.pc.gam.large = gam(formula, data=d, family = binomial, subset=d$train)
+
+par(mfrow=c(3,3), mar=c(3.9,3.9,1,1))
+plot(fit.pc.gam.large, se=T)
+```
+Again we see that the standard error is low around zero. Some principal component have a wider spread and thus have more points at the extreme. An example of this is PC2. This holds the standard error low for a bigger range of values. Most however are have large standard errors at the head/tail or both. This is due to 1 or 2 points being very far from the rest and fitting a line trough these are difficult. Examples of these are PC6, PC10, PC15, PC19 among many others. This correspond to some special combination of explanatory variables such that the corresponding principal component is mapped far from the rest.  
+
+## i)
+We begun by fitting all the explanatory variables to a logistic regression model. This gave fairly good results, but since the number of explanatory variables was so big, we aimed to reduce the complexity at the same time possibly increase performance. For this brute force model we achieved:
+
+$$
+TPR = 0.8785 \hspace{10px} TNR = 0.9383
+$$
+
+Our first approach was to preform a principal component analysis on the data set. These principal components are linear combinations of the explanatory variables and aim to make some new variables sorted by most important to least important. This gave some improvements in prediction and we managed to reduce the amount of model variables to 45. This gave:
+
+$$
+TPR = 0.8957 \hspace{10px} TNR = 0.9496
+$$
+
+Lastly we tried to move beyond linearity, by using natural splines with 4 degrees of freedom in our model. We first tested this on the 3 first explanatory variables, where to did achieve an increase in overall performance. As discussed, determining  if this was beneficial was difficult due to the arbitrariness of the 3 variables. Despite this we tried the non-linear structure with the principal components. We archived similar performance as the linear model with only $k=25$ principal components. This last model gave:
+
+$$
+TPR = 0.8900 \hspace{10px} TNR = 0.9534
+$$
+
+From this we conclude that using principal components analysis did increase prediction performance and was the key modification to the model. In addition to increase performance, it also allowed us to use less predictors in our model. When applying the non-linear structure, we did not get a overall better performance from the model. On the other hand it allowed us to use less principal components with equal performance as the linear structure, thus increasing model interpretability.    
+
+There are some weaknesses with the approach we took. Even tough the models gradually used less and less variables, the principal components are linear combinations of the explanatory variables. The gain in interpretability gained by decreasing the number of predictors might somewhat be lost in the sense that the principal components can be hard to understand. In addition the introduction of a non-linear structure also makes this harder. 
+
+One might also be interested in adjusting the threshold. We have consistently stuck with a threshold of 0.5, which is a natural and common first choice. However as the TNR was the most important measure, increasing the threshold might be beneficial to push TNR over 0.95. The use of ROC curves could also give some better insight on the model performance for different thresholds.  
