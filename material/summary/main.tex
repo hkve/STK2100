@@ -105,6 +105,26 @@ Again with $\lambda \geq 0$ and a good value is again essential. Where $|| \cdot
 Lasso has a clear advantage in that it can preform variable selection, setting some coefficients to exactly zero. This of course have limitations as, i.e. if two or more features are highly co-linear Lasso will select on of them randomly with the rest set to zero (Bad for model interpretability). In (very general) terms Ridge is best if you have a small amount of explanatory variables and/or a lot of co-linearity. Lasso shines when there  are more explanatory variables and/or where a simpler model is desired.   
 
 \section{Classification}
+\subsection{Bayes classifier}
+The Bayes classifier is a classification rule that minimizes misclassification. The most common approach to estimate a model $\hat{f}$ is to minimize the \textit{error rate} given by
+
+\begin{align*}
+    L(y_i, \hat{y}_i) = \frac{1}{n}\sum_{i=1}^{n} I(y_i \neq \hat{y}_i)
+\end{align*}
+If all the fitted values matches the actual value (on this training data), the training \textit{error rate} is zero. Often one is most concerned by minimizing the testing \textit{error rate}, that is the previous equation evaluated on data the model have not seen before (not used for training).
+\newline
+It can be shown that this very problem has a very simple answer, the Bayes classifier. It simply assigns each observation to the most likely class, given the data. Given a new data point $x_0$, it should be assigned to the class $j$ with the largest:
+
+\begin{align*}
+    P(y = j | X = x_0)
+\end{align*}
+
+In the binary case ($j = 0, 1$) this correspond to assigning $x_0$ to class $1$ if $P(y=1|X=x_0) > 0.5$. For the binary case this draws a decision boundary at $P(y=1|X=x_0) = 0.5$, effectively splitting the two classes by a line (2D) or hyper plane (nD). The error rate at $X=x_0$ is $1-\text{Max}_j P(y=j|X=x_0)$ and thus the overall error rate is given by:
+
+\begin{align}
+    1 - \E [ \text{Max}_j P(y=j|X=x_0)] ]
+\end{align}
+
 \subsection{Logistic regression}
 Logistic regression is kind of a classification method \textbf{and} a regression method. Pro die hard statistician's want to call it a regression, but I put it here since the goal of the method is to \textit{classify} a target. However the process of achieving the classification model, requires a \textit{regression}. If we want to preform a logistic regression on two data variables $\Vec{x} = (x_1, x_2)$ with a probability $p$ of outcome $A$. We define $\beta(x_1, x_2) = \beta_0 + \beta_1 x_1 + \beta_2 x_2$ (can of course be generalized to more)
 
@@ -116,11 +136,20 @@ where $logit$ maps the probability $p \in (0,1)$ to $logit(p) \in (-\infty, \inf
 \begin{align*}
     p(x_1, x_2) = \frac{e^{\beta(x_1,x_2)}}{e^{\beta(x_1,x_2)}+1} = \frac{1}{1+e^{-\beta(x_1,x_2)}}
 \end{align*}
-Now $\beta(x_1,x_2)$ can be fitted on $(-\infty, \infty)$ while the probability $p$ for outcome $A$ is still $(0,1)$. To evaluate a threshold $\mathcal{T}$ is given, typically 0.5. If the probability $p$ is bigger than the threshold, classify as A, else not A. In our example.
+Now $\beta(x_1,x_2)$ can be fitted on $(-\infty, \infty)$ while the probability $p$ for outcome $A$ is still $(0,1)$. To evaluate a threshold $\mathcal{T}$ is given, typically chosen to be 0.5 (Bayes classifier). If the probability $p$ is bigger than the threshold, classify as A, else not A. In our example.
 
 \begin{align*}
     \text{if } p(x_1, x_2) > \mathcal{T} \rightarrow A, \text{     else} \rightarrow \text{not } A 
 \end{align*}
+
+\subsection{K-Nearest Neighbor}
+K-Nearest Neighbor (KNN) can not calculate the conditional distribution of $Y$ given $X$ and can thus not use the Bayes classifier. It deals with classifying a new point $x_0$ to the same class as its $K$ nearest neighbours (in feature space). The choice of $K$ is thus important, as it considers how many points should be considered when calculating the probability. 
+
+\begin{align*}
+    P(y=j|X=x_0) = \frac{1}{K} \sum_{i \in \mathcal{N}_0} I(y_i=j)
+\end{align*}
+
+With a small $K$ (say 5), the model only considers a handful of neighbours and the model has a low bias but high variance. In the extreme case $K=1$ only one point is considered. The train error in this case would always be zero as it classifies each point to itself. Larger K's has a higher bias, but often a lower variance. The test error rate, plotted as a function of $K$, often has a characteristic U-shape, where it preforms bad for low $K$ due to the high variance, finding some sort of minimum at a bias variance trade-off, before increasing again due to the high bias. The train error on the other hand will most likely grow with $K$ (with a guaranteed minimum at $K=1$).
 
 \subsection{Discriminant Analysis}
 Using Bayes theorem, we can construct classification with more $K \geq 2$. When given the data, the goal is to somehow split the dataset with a line and project the datapoints on this line, with some criteria on how the line is drawn. 
@@ -328,13 +357,28 @@ Since we have a $B$ trees, we loose a lot of interpretability. One can iterate o
     \end{enumerate}
 \end{itemize}
 
+\subsection{Boosting}
+Boosting is a way to let new grown trees learn from its predecessors mistakes. One sets the number of trees to train $B$ and the number of splits $d$ (and thus $d+1$ terminal nodes). Each tree is fitted on the data $X$, but the target is the residuals from the previous tree. This can be implemented for regression and classification, but we will only deal with regression. The algorithm can be outlined as.
+
+\begin{enumerate}
+    \item We set $r_i = y_i$ for all $i$. This can be seen as the residuals of the empty tree (represented by $\hat{f}(x) = 0$ if you will).
+    \item For b = 1, ... , B
+    \begin{enumerate}
+        \item Fit a tree $\hat{f}_b$ (with the $d$ splits) with the features $X$ and target $r$.
+        \item Record tree $\hat{f}_b$ 
+        \item Update residuals $r_i \xleftarrow{} r_i - \lambda \hat{f}_b(x_i)$
+    \end{enumerate}
+    \item The final model is then $\hat{f}(x) = \sum_{b = 1}^{B}\lambda \hat{f}_b(x)$
+\end{enumerate}
+
+
 \subsection{Random Forest}
 In bagging the $B$ trees are somewhat correlated. Since at every split all trees considers all the $p$ predictors to decrease RSS/Gini index the trees might look very similar. Random forest tries to \textit{decorrelate} the trees, by limiting the amount of possible variables to split. At each split a random sample of $m > p$ possible predictors are chosen. Commonly $m = \sqrt{p}$ is chosen, but can be varied to optimize performance, $m = p$ reduces to bagging. 
 \\
 This is (counter-intuitively) often a good choice since a strong predictor at the top of the tree will produce similar trees if all $p$ predictors are considered. Limiting the choice to $m$ predictors for each split motivates more diverse trees. As in bagging large $B$s does not overfit and can be chosen large enough for test error to stabilize.   
 
 \section{Support Vector Machines}
-Support vector machines is a loose term containing three models. All the methods are used for \textit{classification} 
+Support vector machines is a loose term containing three models. All the methods are used for \textit{classification}, but can under some circumstances to modified to preform \textit{regression}. All these methods need \textit{feature scaling}  
 
 \begin{enumerate}
     \item Maximal margin classifier
@@ -388,6 +432,128 @@ Where $K$ is the kernal, defining the inner product. It can take many forms, a f
     \item Polynomial: $K(x_i, x_j) \left( 1+ \sum_{k=1}^{p} x_{ik}x_{jk}\right)^d, d > 1$
     \item Radial: $K(x_i, x_j) = exp(-\gamma \sum_{k=1}^{p}(x_{ik}-x_{jk})^2), \gamma > 0$
 \end{itemize}
+
+\section{Unsupervised Learning}
+Unsupervised learning differs from supervised learning in one import note. The target (that we are trying to predict) is not tagged by a human. This means that instead of predicting $y$ from $X$, $y$ is unknown and thus fundamentally changes the core problem. As we do not know the target $y$, prediction is uninteresting. Rather, the goal is to discover "interesting things" about the data $X$. We are here concerned with two methods of finding "interesting things", namely \textit{Principal Component Analysis} (PCA) and \textit{clustering}.
+
+Both these methods need feature scaling. The natural choice is to \textit{standardize} them (subtract mean and divide by standard deviation for each variable).
+
+\subsection{Principal Component Analysis}
+The idea of principal component analysis is to make linear combinations of the original variables to maximize the variance. There are two views of this problem, both making use of the fact that the features are standardized. With $\vec{X}$ as a $n \times p$ matrix, we construct new points using:
+
+\begin{align*}
+    z_{i1} = \sum_{j=1}^{p} \phi_{j1}x_{ij}
+\end{align*}
+
+The coefficients $\phi_{i1}$ are called the loading's of the first principal component. The second would be $\phi_{i2}$, the third $\phi_{i3}$ and so on. As $x_{ij}$ is standardized, this is equal to (if not standardized) $x_{ij}-\E [x_{j}]$. Then if we square $z_i1$ and find $\E[x_{i1}]$ we obtain a sort of weighted variance over all $p$ features. We can now maximize the variance by tweaking the loading's $\phi_{11},...,\phi_{p1}$.
+
+\begin{align*}
+    \underset{\phi_{11},...,\phi{p1}}{\text{Max }} \left(\frac{1}{n}\sum_{i=1}^{n} z_{i1}^2\right) \text{   subject to   } \sum_{j=1}^{p} \phi_{j1}^2 = 1
+\end{align*}
+
+The constraints on $\phi_{j1}$ is there to make sure the variance can not be arbitrarily large. Now to find the second PC one preforms the same optimization problem, with the added constraint that the second PC should be uncorrelated with the first. The second view is to note that $\Sigma = \vec{X}^T\vec{X}$ now forms a co-variance matrix (since the data has been standardized). The eigenvectors of this matrix correspond to the PC's, with the first having the largest eigenvalue, the second the second largest and so on. Since $\Sigma$ forms a symmetric matrix, we know that all the eigenvectors should be orthogonal! (Assuming the eigenvalues are not equal). For a data set with $p$ features we have a maximum of $p-1$ PC's.
+
+Often we wish to use quite a low number of PC's. The goal of PCA is to reduce the dimensionality of the feature space, while still explaining a good fraction of the variance.
+
+\subsection{Clustering}
+Clustering deals with partitioning the feature space into subgroups, or \textit{clusters}. This course deals with 2 types of clustering methods, \textit{K-means} and \textit{hierarchical}.
+
+\subsubsection{K-means}
+K-means clustering divides the data into $K$ non-overlapping clusters. The value of $K$ is chosen before the algorithm is preformed. We write the indices of each data point as a member of one and only one cluster $C_1 , ... , C_k$. Since every data point should belong to some cluster we must have $C_1 \cup .... \cup C_k = \{ 1, ... , n\}$. This means that the union of every set must contain every data index (no one is left out). In addition $C_i \cap C_j = Ø, i\neq j$, meaning the overlap of any two sets must be an empty set. To best split the clusters, we need to define a measure that captures the amount of which the data points within a cluster differs from one another. There are many ways to define this measure, but the most common uses the squared Euclidean distance. 
+
+\begin{align*}
+    W(C_k) = \frac{1}{|C_k|} \sum_{i,i' \in C_k}\sum_{j=1}^{p} (x_{ij}-x_{i'j})^2
+\end{align*}
+
+$|C_k|$ is the number of observations inside the $k$th cluster. The sum goes over all $p$-features (finding the Euclidean distance). Then one finds the distance between the $i$th and $i'$th data point inside the cluster. We want to select the clusters such that $W(C_k)$ is as low as possible over all clusters. Thus
+
+\begin{align*}
+    \underset{C_1,...,C_k}{\text{Min }} \left( \sum_{k=1}^{K}W(C_k) \right)
+\end{align*}
+
+Finding the $K$ clusters such that the sum of $W(C_k)$ is minimized is very difficult, since there are extremely many ways to partition the clusters. Luckily one can use randomness in algorithms to produce a \textit{pretty good} solution (Locally the best pick, dependent on the random initialization). 
+
+\begin{enumerate}
+    \item Each observation gets randomly selected to one of the $K$ classes. This is the random part that can produce different results
+    \item Iterate until assignments to new clusters stop
+    \begin{enumerate}
+        \item Each cluster calculates its \textit{centroid}. This is the mean distance (in $p$-dimensional feature space) from all the data points in each cluster.
+        \item Go over all data points and calculate the distance to each of the $K$ centroids. Assign to the cluster where the distance from the data point to the centroid is the smallest.
+    \end{enumerate}
+\end{enumerate}
+
+The algorithm ensures to find a solution, but is dependent on how the data points are randomly assigned. Thus, one should run the alogrithm multiple times and choose the best clustering based on the minimization over $C_1, ... , C_k$.  
+
+\subsubsection{Hierarchical}
+Hierarchical clustering algorithms (HCA) is an alternative to K-means that does not require to choose $K$ \textbf{before} the algorithm is preformed. After the algorithm is preformed, one uses a \textit{dendrogram} to choose $K$ (how many clusters you want) based on the shape/properties of the dendrogram.
+
+To preform HCA we have to specify a dissimilarity measure. In the K-means section we use the Euclidean distance, but other measures can be used as well. In addition we need to select a linkage. This expands the idea of dissimilarity between observation to dissimilarity between clusters. In the K-means section, we used the \textit{centroid} of the clusters, but other measures exists (see list after dendrogram explanation). The recipe for HCA can either bottom-up (agglomerative) or top-down (divisive). Agglomerative puts each observation in it's on cluster, and merge one cluster at each iteration until there is only one cluster left. Divisive starts with all observations in one cluster, and splits the clusters at each iteration until each observation has its own cluster. The most common approach is agglomerative and is the one used in this course:
+
+\begin{enumerate}
+    \item Each observation gets it's own cluster. Calculate the dissimilarity between all ${n \choose 2}$ clusters. 
+    \item For i = n, ... , 2
+    \begin{enumerate}
+        \item For each cluster, search the pair-wise dissimilarity between every other cluster. Merge the clusters with the lowest dissimilarity (most similar) to form a new cluster. We have now reduced from $i$ clusters to $i-1$ clusters. This is a new "fuse" on the dendrogram and the height corresponds to the dissimilarity between the clusters.  
+        \item Use your selected linkage to find the dissimilarity between each of the now $i-1$ clusters. Repeat until $i=2$, so that we end up with $i-1=1$ clusters.      
+    \end{enumerate}
+\end{enumerate}
+
+\begin{minipage}{0.5\textwidth}
+\begin{figure}[H]
+\includegraphics[width=0.9\linewidth]{hierarchical_clustering.png}
+\caption{\label{fig:roc} Illustration of a dendrogram.}
+\end{figure}
+\end{minipage} \hfill
+\begin{minipage}{0.5\textwidth}
+An example of a dendrogram. The red vertical line represents dissimilarity. The higher up the red arrow the split happens, the more dissimilar the characters are. Patty and Selma are twins, so they are definitely very similar (and thus low on the dissimilarity arrow). Lisa is Marge's daughter, thus they are also similar, but less so than the twins (thus the split happens higher up the dissimilarity arrow). As Marge, Patty and Selma all are sisters, they are similar and gets connected higher up the tree. As Lisa is already connected with Marge, they are both connected with Patty and Selma. Finally Edna is Lisa's teacher, but have no direct connection to any of the other four. Thus they are connected at the very end (at the top of the dissimilarity arrow).        
+\end{minipage}
+\textbf{Different linkage methods}. Here we use linkage to compute dissimilarity between clusters. We always merge the clusters with the \textit{least} dissimilarity (most similar), but the linkage only decides how this distance is measured.  
+\begin{itemize}
+    \item \textit{Single}: $D(c_1, C_2) = \text{Min}_{x_i \in c_1, x_j \in c_2} D(x_i, x_j)$ between cluster 1 and cluster 2. This means that we find (out of every point in $c_1$ and $c_2$) the minimum distance between two points. Can result in trailing where clusters merge in single observations one at a time.   
+    \item \textit{Complete}: $D(c_1, C_2) = \text{Max}_{x_i \in c_1, x_j \in c_2} D(x_i, x_j)$ between cluster 1 and 2. We find the maximum distance between two points in two clusters. Forces spherical clusters with almost constant diameter.
+    \item \textit{Average}: $D(c_1, c_2) = (|c_1| |c_2|)^{-1} \sum_{x_i \in c_1}\sum_{x_j \in c_2} D(x_i,x_j)$. between cluster 1 and 2. Here we record the distance between every pair of points between the two clusters and uses the mean of these values. A middle ground between single and complete, less affected by outliers. 
+    \item \textit{Centroid}: $D(c_1,c_2) = D(|c_1|^{-1}\sum_{x_i \in c_1} x_i, |c_2|^{-1}\sum_{x_i \in c_2} x_i)$.This is the one used in K-means clustering.
+\end{itemize}
+
+\section{Very brief Neural Networks}
+For neural nets we use \textit{layers}. Each layer has a set amount of \textit{nodes}. The first layer has $p$ nodes, corresponding to one node for each dimension in the data set (input). The last layer has $q$ nodes, one for each class of the response variable (output). What makes neural nets different are the layer(s) in between the input and output layer, these are called hidden or latent layers. For each layer, there is a connection between the layer before and after, where every node in the middle is connected to every node in front and back.    
+
+\subsection{One hidden layer}
+For only hidden one layer, we have $r$ nodes connected to all the $p$ input nodes and $q$ output nodes. We first need to connect the input layer with the hidden layer, and then the hidden layer with the output layer. We write the input nodes as $x_k$, hidden layer nodes as $z_l$ and output layer nodes as $y_m$. We want every node to contribute a constant value as the function argument. Also setting $x_0 = z_0 = 1$ we allow for constant terms. Thus the node values $z_l$ and $y_k$ can expressed as:
+
+\begin{align*}
+    z_l = f_0 \left( \sum_{i=0}^{n} \alpha_{il}x_i \right) \hspace{20px} y_k = f_1 \left( \sum_{i=0}^{r} \beta_{im}z_i \right)
+\end{align*}
+One of the functions $f_0, f_1$ has to be non linear. If not, the problem would reduce to matrix multiplication. A popular choice is the logistic function.
+
+\begin{align*}
+    f(u) = \frac{1}{1+e^{-u}}
+\end{align*}
+To estimate the $\alpha$ and $\beta$ coefficients we can use the usual RSS.
+
+\begin{align*}
+    D_0 = \sum_{i=1}^{n} || y_i - f(x_i)||^2    
+\end{align*}
+Where $\lambda$ is a tuning parameter. Since all the features are effected by the same tuning parameter, all the features should be scaled before fitting. One can also add a penalty term to avoid potential overfitting problems, as these models are very flexible.
+
+\begin{align*}
+    D = D_0 + \lambda J(\alpha,\beta)
+\end{align*}
+
+\begin{itemize}
+    \item Pros
+    \begin{enumerate}
+        \item As we can choose the linking functions $f(\cdot)$, the different methods are very flexible.
+        \item Sequential upgrading, as in $\alpha$ and $\beta$ can be updated after the training is done
+    \end{enumerate}
+    \item Cons
+    \begin{enumerate}
+        \item Hard to choose $r$ and $\lambda$. Sort of arbitrary. 
+        \item The huge number of $\alpha$ and $\beta$ values make is hard to find the lowest $D$ value. There can exist a lot of local minimum points, making methods like cross validation hard. 
+        \item Black box, very difficult to interpret.
+    \end{enumerate}
+\end{itemize}
+
 \section{Potential pitfalls}
 \subsection{Overfitting}
 Considering the MSE $ = \E[\uvec{y}-f(\Vec{x})]$ where $f(\Vec{x})$ represents the target (real, but unknown) function. This quantity can be interpreted as.
@@ -474,9 +640,6 @@ LOOCV is pretty much never feasible to do, but for ordinary LS (No Ridge/Lasso) 
 \end{align*}
 
 
-\section{Analysis}
- 
-
 \section{Model Selection}
 All selection models can use different measures to classify the "best" model or "smallest" error. Some examples:
 
@@ -522,7 +685,7 @@ The \textit{root square error} (RSE). Provides an absolute measure of lack of fi
 And the \textit{total sum of squares} (TSS)
 
 \begin{align*}
-    TSS = \sum_{i=0}^{n} = (y_i - \Bar{y})^2
+    TSS = \sum_{i=0}^{n} (y_i - \Bar{y})^2
 \end{align*}
 We also define $R^2$ as a mesure of how good a linear fit our model is. Note that $R^2$ will \textbf{always} increase (or stay the same) when adding more paramters $p$ as we fit the data set better, but this might not reflect the true population and might preform worse on new test data. Adjusted $R^2$ tries to compensate for this.
 
@@ -530,7 +693,13 @@ We also define $R^2$ as a mesure of how good a linear fit our model is. Note tha
     R^2 = 1 - \frac{RSS}{TSS}
 \end{align*}
 
-When comparing models the response should ideally be on the original scale of the data. You can compear models with the same target transformation, but not when they differ.
+An alternative to pure $R^2$ is the adjusted $R^2$, that tries to compensate for removing predictors as well as sample size.
+
+\begin{align}
+    R^2_{adj} = 1-\frac{RSS/(n-p-1)}{TSS/(n-1)}
+\end{align}
+
+When comparing models the response should ideally be on the original scale of the data. You can compeer models with the same target transformation, but not when they differ.
 
 \subsection{Likelihood function}
 Often just called likelihood describes how "good" a fit is as a function of parameters $\vecsym{\theta}$. It is for by assuming that both the input variables $\Vec{X}$ \textit{and} output variables $\Vec{Y}$ comes from a join probability distribution. It is viewed as a function of $\vecsym{\theta}$ only, so the recorded data ($\Vec{x} \text{ and } \Vec{y}$) are viewed as constant. This is often written as 
